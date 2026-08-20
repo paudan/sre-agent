@@ -1,0 +1,46 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "sre_outage_analysis",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Analyze the sample outage logs, classify events by severity (CRITICAL, WARNING, INFO), and generate an SRE incident report."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The incident report highlights CRITICAL errors including CloudSQL connection pool exhaustion and OOMKilled container events, along with recommended remediation steps."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "raw_log_classification",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Parse and classify this raw GCP log entry: {\"severity\": \"ERROR\", \"httpRequest\": {\"status\": 503}, \"textPayload\": \"HTTP 503 Service Unavailable\"}"
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Classified severity: CRITICAL (HTTP Status 503 Service Unavailable)."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
