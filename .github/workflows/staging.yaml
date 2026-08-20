@@ -13,10 +13,10 @@ on:
       - '.github/workflows/staging.yaml'
 
 jobs:
-  deploy_and_test_staging:
+  deploy_staging:
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
+      contents: 'read'  
       id-token: 'write'
 
     steps:
@@ -104,11 +104,3 @@ jobs:
           else
             echo "ℹ️ Skipping load test GCS export: Bucket name could not be resolved."
           fi
-
-  call_production_workflow:
-    needs: deploy_and_test_staging
-    uses: ./.github/workflows/deploy-to-prod.yaml
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    secrets: inherit
