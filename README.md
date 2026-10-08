@@ -5,7 +5,7 @@
 
 An AI Site Reliability Engineer that reads **GCP Cloud Logging** exports, classifies every event by severity, traces cascading failures across services, and writes a structured **incident report** with a root cause analysis and prioritized remediation steps.
 
-Built with the [Agent Development Kit (ADK)](https://adk.dev/) and Gemini, scaffolded with [`agents-cli`](https://pypi.org/project/google-agents-cli/) 1.9.0, and deployable to **Vertex AI Agent Runtime** behind an **Agent Gateway**.
+More like a conceptual AI SRE assistant rather than a production-ready tool. Built with the [Agent Development Kit (ADK)](https://adk.dev/) and Gemini, scaffolded with [`agents-cli`](https://pypi.org/project/google-agents-cli/) 1.9.0, and deployable to **Vertex AI Agent Runtime** behind an **Agent Gateway**.
 
 ## Contents
 
