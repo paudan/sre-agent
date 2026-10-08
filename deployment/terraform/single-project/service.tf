@@ -24,8 +24,9 @@ resource "google_vertex_ai_reasoning_engine" "app" {
 
   spec {
     agent_framework = var.agent_framework
-    service_account = google_service_account.app_sa.email
-    identity_type   = "SERVICE_ACCOUNT"
+    # Agent Gateway requires an Agent Identity (see agent_gateway.tf); the roles
+    # app_sa_roles are granted to its principal set there.
+    identity_type = "AGENT_IDENTITY"
 
     deployment_spec {
       min_instances         = 1
