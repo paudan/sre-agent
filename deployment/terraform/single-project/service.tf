@@ -23,8 +23,9 @@ resource "google_vertex_ai_reasoning_engine" "app" {
   project      = var.project_id
 
   spec {
-    agent_framework = "google-adk"
+    agent_framework = var.agent_framework
     service_account = google_service_account.app_sa.email
+    identity_type   = "SERVICE_ACCOUNT"
 
     deployment_spec {
       min_instances         = 1
@@ -49,7 +50,7 @@ resource "google_vertex_ai_reasoning_engine" "app" {
       }
 
       env {
-        name  = "GOOGLE_GENAI_USE_VERTEXAI"
+        name  = "GOOGLE_GENAI_USE_ENTERPRISE"
         value = "True"
       }
 
@@ -58,6 +59,9 @@ resource "google_vertex_ai_reasoning_engine" "app" {
         value = "sre-agent"
       }
 
+      # Prompt/response content capture, off by default. Go: set "true" to log
+      # content to OTLP log events for the completions view. Python: content goes to
+      # GCS via the completion hook, so NO_CONTENT.
       env {
         name  = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
         value = "NO_CONTENT"

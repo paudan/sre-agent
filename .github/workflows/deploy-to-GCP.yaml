@@ -1,4 +1,4 @@
-name: Deploy to Staging
+name: Deploy to GCP
 
 on:
   push:
@@ -7,16 +7,17 @@ on:
     paths:
       - 'app/**'
       - 'tests/**'
-      - 'terraform/**'
       - 'uv.lock'
       - 'pyproject.toml'
-      - '.github/workflows/staging.yaml'
+      - 'Dockerfile'
+      - '.github/workflows/deploy-to-gcp.yaml'
+  workflow_dispatch:
 
 jobs:
-  deploy_staging:
+  deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'  
+      contents: 'read'
       id-token: 'write'
 
     steps:
@@ -35,10 +36,10 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || secrets.WORKLOAD_IDENTITY_PROVIDER || format('projects/{0}/locations/global/workloadIdentityPools/{1}/providers/{2}', vars.GCP_PROJECT_NUMBER, secrets.WIF_POOL_ID, secrets.WIF_PROVIDER_ID) }}"
-          service_account: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          workload_identity_provider: 'projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ secrets.WIF_POOL_ID }}/providers/${{ secrets.WIF_PROVIDER_ID }}'
+          service_account: '${{ secrets.APP_SERVICE_ACCOUNT }}'
           create_credentials_file: true
-          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT || vars.CICD_PROJECT_ID }}
+          project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
 
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
@@ -48,24 +49,23 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Deploy to Staging (Agent Runtime)
+      - name: Deploy to GCP (Agent Runtime)
         run: |
-          PROJECT_ID="${{ vars.STAGING_PROJECT_ID || vars.GOOGLE_CLOUD_PROJECT }}"
-          PROJECT_NAME="${{ vars.PROJECT_NAME || 'sre-agent' }}"
-          LOGS_BUCKET="${{ vars.LOGS_BUCKET_NAME_STAGING || vars.LOGS_BUCKET_NAME }}"
-          if [ -z "$LOGS_BUCKET" ] && [ -n "$PROJECT_ID" ]; then
-            LOGS_BUCKET="${PROJECT_ID}-${PROJECT_NAME}-logs"
-          fi
+          PROJECT_ID="${{ secrets.GOOGLE_CLOUD_PROJECT }}"
+          LOGS_BUCKET="${{ secrets.LOGS_BUCKET_NAME }}"
 
           ENV_VARS="OTEL_RESOURCE_ATTRIBUTES=service.version=${{ github.sha }}"
           if [ -n "$LOGS_BUCKET" ]; then
             ENV_VARS="${ENV_VARS},LOGS_BUCKET_NAME=${LOGS_BUCKET}"
           fi
+          if [ -n "${{ vars.GOOGLE_GENAI_USE_ENTERPRISE }}" ]; then
+            ENV_VARS="${ENV_VARS},GOOGLE_GENAI_USE_ENTERPRISE=${{ vars.GOOGLE_GENAI_USE_ENTERPRISE }}"
+          fi
 
-          uvx google-agents-cli@1.4.0 deploy \
+          uvx google-agents-cli@1.9.0 deploy \
             --project "${PROJECT_ID}" \
-            --region "${{ vars.REGION }}" \
-            --service-account="${{ vars.APP_SERVICE_ACCOUNT_STAGING || secrets.GCP_SERVICE_ACCOUNT }}" \
+            --region "${{ secrets.REGION }}" \
+            --service-account="${{ secrets.APP_SERVICE_ACCOUNT }}" \
             --update-env-vars="${ENV_VARS}"
 
       - name: Fetch Auth Token
@@ -87,13 +87,8 @@ jobs:
 
       - name: Export Load Test Results to GCS
         run: |
-          PROJECT_ID="${{ vars.STAGING_PROJECT_ID || vars.GOOGLE_CLOUD_PROJECT }}"
-          PROJECT_NAME="${{ vars.PROJECT_NAME || 'sre-agent' }}"
-          LOGS_BUCKET="${{ vars.LOGS_BUCKET_NAME_STAGING || vars.LOGS_BUCKET_NAME }}"
-          if [ -z "$LOGS_BUCKET" ] && [ -n "$PROJECT_ID" ]; then
-            LOGS_BUCKET="${PROJECT_ID}-${PROJECT_NAME}-logs"
-          fi
-
+          PROJECT_ID="${{ secrets.GOOGLE_CLOUD_PROJECT }}"
+          LOGS_BUCKET="${{ secrets.LOGS_BUCKET_NAME }}"
           if [ -n "$LOGS_BUCKET" ]; then
             TIMESTAMP=$(date +%Y%m%d-%H%M%S)
             gcloud storage cp --recursive tests/load_test/.results "gs://${LOGS_BUCKET}/load-test-results/results-${TIMESTAMP}" --quiet

@@ -1,3 +1,16 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import asyncio
 import json
@@ -195,20 +208,34 @@ def test_a2a_chat_stream(server_fixture: subprocess.Popen[str]) -> None:
 
 def test_agent_card(server_fixture: subprocess.Popen[str]) -> None:
     """Test that the A2A agent card is served at the well-known URI."""
-    response = requests.get(AGENT_CARD_URL, timeout=10)
-    assert response.status_code == 200, f"A2A endpoint returned {response.status_code}"
+    for _ in range(3):
+        response = requests.get(AGENT_CARD_URL, timeout=10)
+        assert response.status_code == 200, (
+            f"A2A endpoint returned {response.status_code}"
+        )
 
-    served_agent_card = response.json()
-    # supportedInterfaces is the A2A 1.0 marker (replaces url/preferredTransport).
-    for field in (
-        "name",
-        "description",
-        "skills",
-        "capabilities",
-        "version",
-        "supportedInterfaces",
-    ):
-        assert field in served_agent_card, f"Missing field in agent card: {field}"
+        served_agent_card = response.json()
+        # supportedInterfaces is the A2A 1.0 marker (replaces url/preferredTransport).
+        for field in (
+            "name",
+            "description",
+            "skills",
+            "capabilities",
+            "version",
+            "supportedInterfaces",
+        ):
+            assert field in served_agent_card, f"Missing field in agent card: {field}"
+
+        interfaces = served_agent_card.get("supportedInterfaces", [])
+        v03_interfaces = [
+            i
+            for i in interfaces
+            if i.get("protocolBinding") == "JSONRPC"
+            and i.get("protocolVersion") == "0.3"
+        ]
+        assert len(v03_interfaces) == 1, (
+            f"Expected exactly one v0.3 interface, found {len(v03_interfaces)}"
+        )
 
 
 def test_reasoning_engine_stream(server_fixture: subprocess.Popen[str]) -> None:
@@ -236,3 +263,27 @@ def test_reasoning_engine_stream(server_fixture: subprocess.Popen[str]) -> None:
         for event in events
     )
     assert has_text, "No text content in reasoning_engine events"
+
+
+def test_reasoning_engine_sync_stream(server_fixture: subprocess.Popen[str]) -> None:
+    """The reasoning_engine adapter supports sync generators via stream_query."""
+    response = requests.post(
+        f"{BASE_URL}/api/stream_reasoning_engine",
+        headers=HEADERS,
+        json={
+            "class_method": "stream_query",
+            "input": {"user_id": f"u-{uuid.uuid4()}", "message": "Hi!"},
+        },
+        stream=True,
+        timeout=60,
+    )
+    assert response.status_code == 200
+
+    events = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+    assert events, "No events from reasoning_engine adapter"
+    has_text = any(
+        (event.get("content") or {}).get("parts")
+        and any(part.get("text") for part in event["content"]["parts"])
+        for event in events
+    )
+    assert has_text, "No text content in reasoning_engine sync events"

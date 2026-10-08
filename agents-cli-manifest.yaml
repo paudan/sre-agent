@@ -1,5 +1,5 @@
 name: sre-agent
-acli_version: 1.4.0
+acli_version: 1.9.0
 agent_directory: app
 region: us-east1
 base_template: adk
@@ -7,8 +7,8 @@ generated_at: '2026-08-20T11:44:05.089554+00:00'
 language: python
 create_params:
   deployment_target: agent_runtime
-  cicd_runner: github_actions
+  cicd_runner: skip
   is_a2a: true
-  agent_gateway: false
+  agent_gateway: true
   agent_guidance_filename: GEMINI.md
   agent_directory: .

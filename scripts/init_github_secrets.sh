@@ -33,15 +33,12 @@ fi
 
 # 3. Read & Validate Required Variables from .env
 PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-}"
-SERVICE_ACCOUNT="${GCP_SERVICE_ACCOUNT:-}"
+PROJECT_NAME="${PROJECT_NAME:-sre-agent}"
+# Service account created by deployment/terraform/single-project (also used by GitHub Actions)
+APP_SERVICE_ACCOUNT="${APP_SERVICE_ACCOUNT:-${PROJECT_NAME}-app@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 if [ -z "${PROJECT_ID}" ]; then
     echo "❌ Error: GOOGLE_CLOUD_PROJECT is not set in .env file."
-    exit 1
-fi
-
-if [ -z "${SERVICE_ACCOUNT}" ]; then
-    echo "❌ Error: GCP_SERVICE_ACCOUNT is not set in .env file."
     exit 1
 fi
 
@@ -56,10 +53,10 @@ if [ -z "${REPO:-}" ]; then
     fi
 fi
 
-WIF_POOL_ID="${WIF_POOL_ID:-github-actions-pool}"
-WIF_PROVIDER_ID="${WIF_PROVIDER_ID:-github-provider}"
+# Workload Identity Federation pool/provider created by single-project/wif.tf
+WIF_POOL_ID="${WIF_POOL_ID:-${PROJECT_NAME}-pool}"
+WIF_PROVIDER_ID="${WIF_PROVIDER_ID:-${PROJECT_NAME}-oidc}"
 REGION="${REGION:-us-east1}"
-PROJECT_NAME="${PROJECT_NAME:-sre-agent}"
 LOGS_BUCKET_NAME="${PROJECT_ID}-${PROJECT_NAME}-logs"
 
 echo "🔍 Fetching GCP Project Number for '${PROJECT_ID}'..."
@@ -70,25 +67,19 @@ if [ -z "${PROJECT_NUMBER}" ]; then
     exit 1
 fi
 
-WIF_PROVIDER_RESOURCE="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WIF_POOL_ID}/providers/${WIF_PROVIDER_ID}"
-
-# 4. Set GitHub Secrets
+# 4. Set GitHub Secrets (everything but the non-sensitive model switch, since this is a public demo)
 echo "🔑 Setting Secrets..."
-gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo "${REPO}" --body "${WIF_PROVIDER_RESOURCE}"
-gh secret set WORKLOAD_IDENTITY_PROVIDER     --repo "${REPO}" --body "${WIF_PROVIDER_RESOURCE}"
 gh secret set WIF_POOL_ID                    --repo "${REPO}" --body "${WIF_POOL_ID}"
 gh secret set WIF_PROVIDER_ID                --repo "${REPO}" --body "${WIF_PROVIDER_ID}"
-gh secret set GCP_SERVICE_ACCOUNT            --repo "${REPO}" --body "${SERVICE_ACCOUNT}"
+gh secret set GOOGLE_CLOUD_PROJECT           --repo "${REPO}" --body "${PROJECT_ID}"
+gh secret set GCP_PROJECT_NUMBER             --repo "${REPO}" --body "${PROJECT_NUMBER}"
+gh secret set REGION                         --repo "${REPO}" --body "${REGION}"
+gh secret set APP_SERVICE_ACCOUNT            --repo "${REPO}" --body "${APP_SERVICE_ACCOUNT}"
+gh secret set LOGS_BUCKET_NAME               --repo "${REPO}" --body "${LOGS_BUCKET_NAME}"
 
-# 5. Set GitHub Variables
+# 5. Set GitHub Variables (only non-sensitive settings)
 echo "📊 Setting Variables..."
-gh variable set GOOGLE_CLOUD_PROJECT         --repo "${REPO}" --body "${PROJECT_ID}"
-gh variable set STAGING_PROJECT_ID           --repo "${REPO}" --body "${PROJECT_ID}"
-gh variable set GCP_PROJECT_NUMBER           --repo "${REPO}" --body "${PROJECT_NUMBER}"
-gh variable set REGION                       --repo "${REPO}" --body "${REGION}"
-gh variable set APP_SERVICE_ACCOUNT_STAGING  --repo "${REPO}" --body "${SERVICE_ACCOUNT}"
-gh variable set LOGS_BUCKET_NAME_STAGING     --repo "${REPO}" --body "${LOGS_BUCKET_NAME}"
-gh variable set LOGS_BUCKET_NAME             --repo "${REPO}" --body "${LOGS_BUCKET_NAME}"
+gh variable set GOOGLE_GENAI_USE_ENTERPRISE  --repo "${REPO}" --body "${GOOGLE_GENAI_USE_ENTERPRISE:-true}"
 
 echo "--------------------------------------------------------"
 echo "✅ All GitHub Secrets and Variables configured successfully for ${REPO}!"

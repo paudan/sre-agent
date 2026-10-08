@@ -142,9 +142,26 @@ dmypy.json
 # PyCharm
 .idea
 
-# User-specific files
+# Terraform
 .terraform*
 .Terraform*
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+backend.hcl
+tfplan
+tfplan.out
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
 # Ruff cache
 .ruff_cache/

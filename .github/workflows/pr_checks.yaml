@@ -7,10 +7,10 @@ on:
     paths:
       - 'app/**'
       - 'tests/**'
-      - 'terraform/**'
       - 'uv.lock'
       - 'pyproject.toml'
-      - '.github/workflows/pr_checks.yaml'  
+      - 'Dockerfile'
+      - '.github/workflows/pr_checks.yaml'
 
 jobs:
   test:
@@ -26,10 +26,10 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER || secrets.WORKLOAD_IDENTITY_PROVIDER || format('projects/{0}/locations/global/workloadIdentityPools/{1}/providers/{2}', vars.GCP_PROJECT_NUMBER, secrets.WIF_POOL_ID, secrets.WIF_PROVIDER_ID) }}"
-          service_account: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+          workload_identity_provider: 'projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ secrets.WIF_POOL_ID }}/providers/${{ secrets.WIF_PROVIDER_ID }}'
+          service_account: '${{ secrets.APP_SERVICE_ACCOUNT }}'
           create_credentials_file: true
-          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT || vars.CICD_PROJECT_ID }}
+          project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v4
@@ -52,6 +52,7 @@ jobs:
         # Integration tests run the agent in-process; pytest doesn't load .env.
         env:
           GOOGLE_GENAI_USE_VERTEXAI: 'true'
-          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT || vars.CICD_PROJECT_ID }}
+          GOOGLE_GENAI_USE_ENTERPRISE: ${{ vars.GOOGLE_GENAI_USE_ENTERPRISE }}
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
           GOOGLE_CLOUD_LOCATION: global
         run: uv run pytest tests/integration

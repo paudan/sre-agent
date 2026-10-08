@@ -1,3 +1,16 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Serve the reasoning_engine ``{class_method, input}`` contract over HTTP.
 
@@ -14,6 +27,7 @@ import json
 
 from agentplatform.agent_engines.templates.adk import AdkApp
 from fastapi import FastAPI, HTTPException, Request, encoders, responses
+from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 
 from app.app_utils import services
 
@@ -66,10 +80,20 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
     async def stream_query(request: Request) -> responses.StreamingResponse:
         body = await request.json()
         method = resolve_method(body["class_method"], streaming=True)
+        kwargs = body.get("input") or {}
+        stream = (
+            await method(**kwargs)
+            if inspect.iscoroutinefunction(method)
+            else method(**kwargs)
+        )
 
         async def generator():
-            async for event in method(**(body.get("input") or {})):
-                yield json.dumps(event) + "\n"
+            if hasattr(stream, "__aiter__"):
+                async for event in stream:
+                    yield json.dumps(encoders.jsonable_encoder(event)) + "\n"
+            else:
+                async for event in iterate_in_threadpool(stream):
+                    yield json.dumps(encoders.jsonable_encoder(event)) + "\n"
 
         return responses.StreamingResponse(
             content=generator(), media_type="application/json"
@@ -80,11 +104,10 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
         body = await request.json()
         method = resolve_method(body["class_method"], streaming=False)
         kwargs = body.get("input") or {}
-        output = (
-            await method(**kwargs)
-            if inspect.iscoroutinefunction(method)
-            else method(**kwargs)
-        )
+        if inspect.iscoroutinefunction(method):
+            output = await method(**kwargs)
+        else:
+            output = await run_in_threadpool(method, **kwargs)
         return responses.JSONResponse(
             content=encoders.jsonable_encoder({"output": output})
         )

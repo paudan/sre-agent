@@ -35,14 +35,12 @@ else {
 
 # 3. Read & Validate Required Variables from .env
 $ProjectId = $env:GOOGLE_CLOUD_PROJECT
-$ServiceAccount = $env:GCP_SERVICE_ACCOUNT
+$ProjectName = if ($env:PROJECT_NAME) { $env:PROJECT_NAME } else { "sre-agent" }
+# Service account created by deployment/terraform/single-project (also used by GitHub Actions)
+$AppServiceAccount = if ($env:APP_SERVICE_ACCOUNT) { $env:APP_SERVICE_ACCOUNT } else { "$ProjectName-app@$ProjectId.iam.gserviceaccount.com" }
 
 if (-not $ProjectId) {
     Write-Error "❌ GOOGLE_CLOUD_PROJECT is not set in .env file."
-}
-
-if (-not $ServiceAccount) {
-    Write-Error "❌ GCP_SERVICE_ACCOUNT is not set in .env file."
 }
 
 # Detect repository owner/name from git remote if REPO not explicitly set
@@ -57,10 +55,10 @@ if (-not $Repo) {
     }
 }
 
-$WifPoolId = if ($env:WIF_POOL_ID) { $env:WIF_POOL_ID } else { "github-actions-pool" }
-$WifProviderId = if ($env:WIF_PROVIDER_ID) { $env:WIF_PROVIDER_ID } else { "github-provider" }
+# Workload Identity Federation pool/provider created by single-project/wif.tf
+$WifPoolId = if ($env:WIF_POOL_ID) { $env:WIF_POOL_ID } else { "$ProjectName-pool" }
+$WifProviderId = if ($env:WIF_PROVIDER_ID) { $env:WIF_PROVIDER_ID } else { "$ProjectName-oidc" }
 $Region = if ($env:REGION) { $env:REGION } else { "us-east1" }
-$ProjectName = if ($env:PROJECT_NAME) { $env:PROJECT_NAME } else { "sre-agent" }
 $LogsBucketName = "$ProjectId-$ProjectName-logs"
 
 Write-Host "🔍 Fetching GCP Project Number for '$ProjectId'..."
@@ -70,25 +68,20 @@ if (-not $ProjectNumber) {
     Write-Error "❌ Could not determine Project Number for project '$ProjectId'."
 }
 
-$WifProviderResource = "projects/$ProjectNumber/locations/global/workloadIdentityPools/$WifPoolId/providers/$WifProviderId"
-
 # 4. Set GitHub Secrets
 Write-Host "🔑 Setting Secrets..."
-gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo $Repo --body $WifProviderResource
-gh secret set WORKLOAD_IDENTITY_PROVIDER     --repo $Repo --body $WifProviderResource
 gh secret set WIF_POOL_ID                    --repo $Repo --body $WifPoolId
 gh secret set WIF_PROVIDER_ID                --repo $Repo --body $WifProviderId
-gh secret set GCP_SERVICE_ACCOUNT            --repo $Repo --body $ServiceAccount
+gh secret set GOOGLE_CLOUD_PROJECT           --repo $Repo --body $ProjectId
+gh secret set GCP_PROJECT_NUMBER             --repo $Repo --body $ProjectNumber
+gh secret set REGION                         --repo $Repo --body $Region
+gh secret set APP_SERVICE_ACCOUNT            --repo $Repo --body $AppServiceAccount
+gh secret set LOGS_BUCKET_NAME               --repo $Repo --body $LogsBucketName
 
-# 5. Set GitHub Variables
+# 5. Set GitHub Variables (only non-sensitive settings)
 Write-Host "📊 Setting Variables..."
-gh variable set GOOGLE_CLOUD_PROJECT         --repo $Repo --body $ProjectId
-gh variable set STAGING_PROJECT_ID           --repo $Repo --body $ProjectId
-gh variable set GCP_PROJECT_NUMBER           --repo $Repo --body $ProjectNumber
-gh variable set REGION                       --repo $Repo --body $Region
-gh variable set APP_SERVICE_ACCOUNT_STAGING  --repo $Repo --body $ServiceAccount
-gh variable set LOGS_BUCKET_NAME_STAGING     --repo $Repo --body $LogsBucketName
-gh variable set LOGS_BUCKET_NAME             --repo $Repo --body $LogsBucketName
+$UseEnterprise = if ($env:GOOGLE_GENAI_USE_ENTERPRISE) { $env:GOOGLE_GENAI_USE_ENTERPRISE } else { "true" }
+gh variable set GOOGLE_GENAI_USE_ENTERPRISE  --repo $Repo --body $UseEnterprise
 
 Write-Host "--------------------------------------------------------"
 Write-Host "✅ All GitHub Secrets and Variables configured successfully for $Repo!"
