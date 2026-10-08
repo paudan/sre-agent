@@ -226,3 +226,6 @@ tools/a2a-inspector/
 *.pem
 *-key.json
 credentials*.json
+
+# Written by `agents-cli deploy`; holds the project number and engine id, so it must not be published
+/deployment_metadata.json

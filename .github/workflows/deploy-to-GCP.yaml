@@ -49,6 +49,27 @@ jobs:
           fi
           echo "name=${gateway}" >> "$GITHUB_OUTPUT"
 
+      # deployment_metadata.json is not committed (it holds the project number), so
+      # point agents-cli at the existing engine instead of letting it create a new one.
+      - name: Locate existing Agent Runtime engine
+        env:
+          PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+          REGION: ${{ secrets.REGION }}
+          ENGINE_NAME: sre-agent
+        run: |
+          engine=$(curl -s \
+            -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+            -H "x-goog-user-project: $PROJECT" \
+            "https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/reasoningEngines" \
+            | jq -r --arg n "$ENGINE_NAME" '[.reasoningEngines[]? | select(.displayName == $n)][0].name // empty')
+          if [ -n "$engine" ]; then
+            jq -n --arg id "$engine" \
+              '{remote_agent_runtime_id: $id, deployment_target: "agent_runtime", is_a2a: true, agent_directory: "app"}' \
+              > deployment_metadata.json
+          else
+            echo "::notice::No engine named '$ENGINE_NAME' found; the deploy will create one."
+          fi
+
       - name: Build agent environment variables
         id: env
         run: |
